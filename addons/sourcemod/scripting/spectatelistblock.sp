@@ -68,9 +68,6 @@ public Action Hook_SetTransmit(int entity, int client)
     return Plugin_Continue;
   }
   
-  if (!IsClientInGame(entity)) { // Not in game.
-    return Plugin_Continue;
-  }
   switch (g_Cvar_BlockMode.IntValue)
   {
     case 0:

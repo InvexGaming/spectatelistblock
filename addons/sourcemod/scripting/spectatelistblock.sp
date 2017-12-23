@@ -5,23 +5,34 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-#define VERSION "1.00"
-
-bool g_LateLoaded = false;
-
-//Convars
-ConVar g_Cvar_BlockMode = null;
-ConVar g_Cvar_BlockFlag = null;
+/*********************************
+ *  Plugin Information
+ *********************************/
+#define PLUGIN_VERSION "1.01"
 
 public Plugin myinfo =
 {
   name = "Spectate List Block",
   author = "Invex | Byte",
   description = "Block Spectate List Feature of many cheating tools.",
-  version = VERSION,
+  version = PLUGIN_VERSION,
   url = "http://www.invexgaming.com.au"
 };
 
+/*********************************
+ *  Globals
+ *********************************/
+
+//Convars
+ConVar g_Cvar_BlockMode = null;
+ConVar g_Cvar_BlockFlag = null;
+
+//Lateload
+bool g_LateLoaded = false;
+
+/*********************************
+ *  Forwards
+ *********************************/
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
   g_LateLoaded = late;
@@ -31,7 +42,6 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 public void OnPluginStart()
 {
   //Convars
-  CreateConVar("sm_spectatelistblock_version", VERSION, "", FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_CHEAT|FCVAR_DONTRECORD);
   g_Cvar_BlockMode = CreateConVar("sm_spectatelistblock_blockmode", "0", "Which players spectator data should be blocked from reaching clients. 0 = block all players, 1 = block all admins, 2 = block people with flag");
   g_Cvar_BlockFlag = CreateConVar("sm_spectatelistblock_blockflag", "z", "Which flag to block if sm_spectatelistblock_blockmode is set to 2");
   
@@ -54,6 +64,10 @@ public void OnClientPutInServer(int client)
     SDKHook(client, SDKHook_SetTransmit, Hook_SetTransmit);
 }
 
+
+/*********************************
+ *  Hooks
+ *********************************/
 public Action Hook_SetTransmit(int entity, int client) 
 {
   if (entity == client) { // Always transmit client to themselves otherwise they will crash
@@ -79,16 +93,13 @@ public Action Hook_SetTransmit(int entity, int client)
     
     case 1:
     {
-      if (ClientHasFlag(entity, Admin_Generic))
+      if (ClientHasAdminFlag(entity, Admin_Generic))
         return Plugin_Handled;
     }
     
     case 2:
     {
-      AdminFlag flag;
-      char buffer[2];
-      g_Cvar_BlockFlag.GetString(buffer, sizeof(buffer));
-      if (FindFlagByChar(buffer[0], flag) && ClientHasFlag(entity, flag))
+      if (IsClientBlockTarget(client))
         return Plugin_Handled;
     }
   }
@@ -96,8 +107,35 @@ public Action Hook_SetTransmit(int entity, int client)
   return Plugin_Continue; // Anything else continue as normal.
 }
 
-stock bool ClientHasFlag(int client, AdminFlag flag)
+/*********************************
+ *  Stocks
+ *********************************/
+stock bool IsClientBlockTarget(int client)
 {
+  if (!IsClientConnected(client) || IsFakeClient(client))
+    return false;
+  
+  char buffer[2];
+  g_Cvar_BlockFlag.GetString(buffer, sizeof(buffer));
+
+  //Empty flag means open access
+  if(strlen(buffer) == 0)
+    return true;
+
+  return ClientHasCharFlag(client, buffer[0]);
+}
+
+stock bool ClientHasCharFlag(int client, char charFlag)
+{
+  AdminFlag flag;
+  return (FindFlagByChar(charFlag, flag) && ClientHasAdminFlag(client, flag));
+}
+
+stock bool ClientHasAdminFlag(int client, AdminFlag flag)
+{
+  if (!IsClientConnected(client))
+    return false;
+  
   AdminId admin = GetUserAdmin(client);
   if (admin != INVALID_ADMIN_ID && GetAdminFlag(admin, flag, Access_Effective))
     return true;
